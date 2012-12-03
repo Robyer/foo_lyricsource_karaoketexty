@@ -14,6 +14,7 @@
     <ProjectGuid>{2BC6E142-2B2A-4E61-A5FE-8694FDC604EE}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>foo_lyricsource</RootNamespace>
+    <ProjectName>foo_lyricsource_karaoketexty</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

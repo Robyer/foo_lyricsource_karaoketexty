@@ -23,7 +23,7 @@ public:
 	my_lyrics_source() : lyric_source_base() {};
 	~my_lyrics_source() {};
 
-	void GetName( pfc::string_base& out ) { out = "My custom 1"; }
+	void GetName( pfc::string_base& out ) { out = "Online DB: Karaoketexty.cz"; }
 
 	const GUID GetGUID();
 

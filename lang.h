@@ -10,8 +10,11 @@
 
 #define VERSION _VERSION
 
-#define COMPONENT_NAME "Custom lyrics source"
+#define COMPONENT_NAME "Lyric Source - Karaoketexty.cz"
 
-#define ABOUT "foo_lyricsource " VERSION "\n" \
- "A custom lyric source developed by The vern.\n" \
+#define ABOUT "foo_lyricsource_karaoketexty " VERSION "\n" \
+ "Lyrics source support for website www.karaoketexty.cz with synced and unsynced lyrics.\n\n" \
+ "Author: Robyer\n" \
+ "Web: http://www.robyer.cz\n" \
+ "E-mail: robyer@seznam.cz\n" \
  "Build Date: " __DATE__ " " __TIME__ "\n"

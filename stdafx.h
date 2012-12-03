@@ -37,5 +37,3 @@
 #include "../../foobar2000/SDK/foobar2000.h"
 #include "../../lyric_source_sdk/lyric_source_sdk.h"
 #pragma comment(lib, "../../foobar2000/shared/shared.lib" )
-
-
