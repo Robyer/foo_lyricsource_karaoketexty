@@ -46,14 +46,15 @@ std::string trim(std::string data)
 	return (begin != std::string::npos) ? data.substr(begin, end - begin) : "";
 }
 
-void replace_all(std::string* data, std::string from, std::string to)
+void replace_all(std::string* data, std::string from, std::string to, bool move_back = false)
 {
 	std::string::size_type position = 0;
 
 	while ((position = data->find(from, position)) != std::string::npos)
 	{
 		data->replace(position, from.size(), to);
-		position++;
+		if (!move_back)
+			position++;
 	}
 }
 
@@ -84,6 +85,27 @@ std::string source_get_value(std::string* data, std::string::size_type start, un
 	
 	va_end(arg);	
 	return ret;
+}
+
+std::string remove_html(std::string data)
+{
+	std::string new_string = "";
+
+	for (std::string::size_type i = 0; i < data.length(); i++)
+	{
+		if (data.at(i) == '<' && data.at(i+1) != ' ')
+		{
+			i = data.find(">", i);
+			if (i == std::string::npos)
+				break;
+
+			continue;
+		}
+
+		new_string += data.at(i);
+	}
+
+	return new_string;
 }
 
 bool my_lyrics_source::Search( const search_info* pQuery, search_requirements::ptr& pRequirements, lyric_result_client::ptr p_results )
@@ -240,10 +262,15 @@ bool my_lyrics_source::Load( lyric_container_base* lyric )
 		lyrics = trim(lyrics) += ", ";
 		replace_all(&lyrics, "new Array(\"", "[");
 		replace_all(&lyrics, "\", \"", "]");
-		replace_all(&lyrics, "\"), ", "\n");
+		replace_all(&lyrics, "\"), ", "\r\n");
+		
+		std::string authors = "\r\n---\r\n";
+		authors += trim(remove_html(source_get_value(&data, 0, 3, "<p class=\"karaoke_author", ">", "</p>")));
+		replace_all(&authors, "\n\n", "\r\n", true);
+		replace_all(&authors, "  ", " ", true);
+		lyrics += authors;
 
 		lyric->SetLyric(lyrics.c_str());
-
 	} else {
 
 		std::string lyrics = source_get_value(&data, 0, 2, "<p class=\"text\">", "</p>");
@@ -251,14 +278,13 @@ bool my_lyrics_source::Load( lyric_container_base* lyric )
 			return false;
 
 		replace_all(&lyrics, "<br />", "");
-
 		
-		// TODO: add authors!
-		std::string::size_type pos = data.find("<div class=\"lyrics_authors\">");
-		if (pos != std::string::npos) {
-			//std::string authors = source_get_value(&data, 0, 2, "<div class=\"lyrics_authors\">"	
-		}		
-
+		std::string authors = "\r\n---\r\n";
+		authors += trim(remove_html(source_get_value(&data, 0, 3, "<div class=\"authors", ">", "</div>")));
+		replace_all(&authors, "\n\n", "\r\n", true);
+		replace_all(&authors, "  ", " ", true);		
+		lyrics += authors;
+		
 		// Copy the lyric text
 		lyric->SetLyric(lyrics.c_str());
 	}
