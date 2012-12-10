@@ -1,4 +1,4 @@
-#define _VER "0.1"
+#define _VER "1.0"
 
 #if _M_IX86_FP > 0
 #define _VERSION _VER " (SSE" TOSTRING(_M_IX86_FP) ")"
