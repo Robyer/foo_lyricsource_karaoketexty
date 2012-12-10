@@ -1,0 +1,1 @@
+Opravit ignorování posledních 2 alb u Jaksi Taksi = proè download_page stahuje pouze 100000 znakù?
