@@ -197,7 +197,7 @@ bool my_lyrics_source::Search( const search_info* pQuery, search_requirements::p
 
 					href = source_get_value(&row, 0, 2, "<a href=\"/karaoke/", "\"");
 					if (!href.empty()) {
-						/*std::string karaoke_url = "http://www.karaoketexty.cz/karaoke/";
+						std::string karaoke_url = "http://www.karaoketexty.cz/karaoke/";
 						karaoke_url += href;
 											
 						lyric_container_base* new_lyric = p_results->AddResult();
@@ -205,14 +205,13 @@ bool my_lyrics_source::Search( const search_info* pQuery, search_requirements::p
 						new_lyric->SetTimestamped(true);
 						new_lyric->SetFoundInfo(artist.c_str(), album.c_str(), title.c_str());
 						new_lyric->SetSources(karaoke_url.c_str(), karaoke_url.c_str(), GetGUID(), ST_INTERNET);
-						new_lyric->SetLoaded(false);*/
+						new_lyric->SetLoaded(false);
 					}
 
 				}
 
 			}
-
-		}		
+		}
 	}		
 
 	return true;
@@ -225,48 +224,46 @@ bool my_lyrics_source::Load( lyric_container_base* lyric )
 	//This gets the source info you set in Search(), 
 	pfc::string8 source, source_private;
 	lyric->GetSources( source, source_private );
-
 	
-	// download and parse lyrics	
-	pfc::string8 url;
-
-/*	if (lyric->IsTimestamped()) {
-		url = "http://www.karaoketexty.cz/karaoke/";
-	} else {
-		url = "http://www.karaoketexty.cz/texty-pisni/";
-	}
-	url += source_private;*/
-	url = source_private;
-
+	// download and parse lyrics
 	pfc::string8 page;
-
-	m_pHttpClient->download_page( page, "Mozilla Firefox", url );
+	m_pHttpClient->download_page( page, "Mozilla Firefox", source_private );
 
 	std::string data = page;
 
-	if (lyric->IsTimestamped()) {
+	//if (lyric->IsTimestamped()) {
+	if (strstr(source_private, "/karaoke/") != NULL) {
 
-		//lyric->SetLyric("TODO: BUDE CASOVANE!");
+		std::string lyrics = source_get_value(&data, 0, 3, "var syltG", "new Array(", ");");
+		std::string::size_type pos = 0, pos2 = 0;
+		
+		lyrics = trim(lyrics) += ", ";
+		replace_all(&lyrics, "new Array(\"", "[");
+		replace_all(&lyrics, "\", \"", "]");
+		replace_all(&lyrics, "\"), ", "\n");
+
+		lyric->SetLyric(lyrics.c_str());
 
 	} else {
 
-		std::string::size_type start = data.find("<p class=\"text\">", 0);
-		std::string::size_type end = data.find("</p>", start);
-		if (start == std::string::npos || end == std::string::npos)
+		std::string lyrics = source_get_value(&data, 0, 2, "<p class=\"text\">", "</p>");
+		if (lyrics.empty())
 			return false;
 
-		start += 16;
-		std::string lyrics = data.substr(start, end-start);
 		replace_all(&lyrics, "<br />", "");
 
+		
 		// TODO: add authors!
+		std::string::size_type pos = data.find("<div class=\"lyrics_authors\">");
+		if (pos != std::string::npos) {
+			//std::string authors = source_get_value(&data, 0, 2, "<div class=\"lyrics_authors\">"	
+		}		
 
-		//Copy the lyric text into here
-		lyric->SetLyric( lyrics.c_str() );
-
+		// Copy the lyric text
+		lyric->SetLyric(lyrics.c_str());
 	}
 
-	//You should set this if the lyric loads properly.
+	// You should set this if the lyric loads properly.
 	// lyric->SetLoaded(); // automatically in SetLyric
 
 	//return true on success, false on failure
