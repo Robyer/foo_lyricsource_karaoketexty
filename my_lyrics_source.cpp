@@ -57,6 +57,35 @@ void replace_all(std::string* data, std::string from, std::string to)
 	}
 }
 
+std::string source_get_value(std::string* data, std::string::size_type start, unsigned int argument_count, ...)
+{
+	va_list arg;
+	std::string ret;
+	std::string::size_type end = 0;
+	
+	va_start(arg, argument_count);
+	
+	for (unsigned int i = argument_count; i > 0; i--)
+	{
+		if (i == 1)
+		{
+			end = data->find(va_arg(arg, char*), start);
+			if (start == std::string::npos || end == std::string::npos)
+				break;
+			ret = data->substr(start, end - start);
+		} else {
+			std::string term = va_arg(arg, char*);
+			start = data->find(term, start);
+			if (start == std::string::npos)
+				break;
+			start += term.length();
+		}
+	}
+	
+	va_end(arg);	
+	return ret;
+}
+
 bool my_lyrics_source::Search( const search_info* pQuery, search_requirements::ptr& pRequirements, lyric_result_client::ptr p_results )
 {
 	TRACK_CALL_TEXT( "my_lyrics_source::Search" );
@@ -68,8 +97,8 @@ bool my_lyrics_source::Search( const search_info* pQuery, search_requirements::p
 	url = "http://www.karaoketexty.cz/search?q=";
 	pfc::urlEncodeAppend(url, pQuery->artist);
 	//url += pQuery->artist;
-	url += " ";
-	pfc::urlEncodeAppend(url, pQuery->title);
+	/*url += " ";
+	pfc::urlEncodeAppend(url, pQuery->title);*/
 	//url += pQuery->title
 
 	pfc::string8 page;
@@ -85,7 +114,7 @@ bool my_lyrics_source::Search( const search_info* pQuery, search_requirements::p
 //	std::string a = pfc::stringcvt::convert_wide_to_ansi(
 
 	std::string data = page;
-	std::string::size_type start = data.find("<ul class='title'>", 0);
+	std::string::size_type start = data.find("<ul class='artist'>", 0);
 	std::string::size_type end = data.find("</ul>", start);
 	if (start == std::string::npos || end == std::string::npos)
 		return false;
@@ -96,48 +125,94 @@ bool my_lyrics_source::Search( const search_info* pQuery, search_requirements::p
 		end = data.find("</li>", start);
 		std::string line = data.substr(start, end - start);
 		start = end;
-		
-		std::string::size_type pos = 0;
 
-		// url
-		pos = line.find("<a href=\"");
-		if (pos == std::string::npos)
-			continue;
+		std::string href = source_get_value(&line, 0, 2, "<a href=\"", "\"");
+		std::string artist = trim(source_get_value(&line, 0, 3, "<a href=\"", ">", "</a>"));
 
-		pos += 9;
-		std::string url = line.substr(pos, line.find("\"", pos) - pos);
+		// search for same artist only
+		if (!_stricmp(artist.c_str(), pQuery->artist)) {
 
-		// artist-title
-		pos = line.find(">", pos);
-		if (pos == std::string::npos)
-			continue;
+			pfc::string8 url;
+			url = "http://www.karaoketexty.cz";
+			url += href.c_str();
+			
+			pfc::string8 page;
+			m_pHttpClient->download_page( page, "Mozilla Firefox", url );
 
-		pos += 1;
-		std::string title = trim(line.substr(pos, line.find("</a>", pos) - pos));
-				
-		// contains artist?
-		std::string artist;
-		pos = title.find(" - ");
-		if (pos != std::string::npos) {
-			artist = title.substr(0, pos);
-			title = title.substr(pos+3);
-		}
+			std::string data = page;
 
-		// ignore not searched results
-		if (_stricmp(artist.c_str(), pQuery->artist) && _stricmp(title.c_str(), pQuery->title))
-			continue;
+			data = data.substr(data.find("<div id=\"left_column"));
+			data = data.substr(0, data.find("<div id=\"right_column"));
+						
+			std::string::size_type pos = 0;
+			std::string::size_type pos2 = 0;
+						
+			while ((pos = data.find("</table>", pos2)) != std::string::npos) {
+				std::string blok = data.substr(pos2, pos-pos2);
+				pos2 = pos+8;
 
-		//then we use the results client to provide an interface which contains the new lyric 
-		lyric_container_base* new_lyric = p_results->AddResult();
+				std::string album;
+				if ((pos = blok.find("<div class=\"album_cover_box")) != std::string::npos) {
+					// album with cover
+					album = source_get_value(&blok, pos, 2, "<strong>", "</strong>");
+				} else {
+					// album without cover
+					album = source_get_value(&blok, 0, 3,"<th class=\"left", ">", "</th>");
+					if ((pos = album.find(">")) != std::string::npos)
+						album = source_get_value(&album, pos, 2, ">", "</");
+				}
 
-		//This is only for demonstration purposes, you should should set these to what you search source returns.
-		new_lyric->SetFoundInfo( artist.c_str(), "", title.c_str()/*pQuery->artist, pQuery->album, pQuery->title*/ );
-		
-		//These tell the user about where the lyric has come from. This is where you should save a web address/file name to allow you to load the lyric
-		new_lyric->SetSources( url.c_str(), url.c_str(), GetGUID(), ST_INTERNET );
+				blok = blok.substr(blok.find("<table"));
 
-		new_lyric->SetTimestamped(false);
-		new_lyric->SetLoaded( false );
+				std::string::size_type pos3 = 0;
+				while ((pos = blok.find("</tr>", pos3)) != std::string::npos) {
+					std::string row = blok.substr(pos3, pos-pos3);
+					pos3 = pos+5;
+
+					std::string title = source_get_value(&row, 0, 3, "<a href=\"/texty-pisni/", ">", "</a>");
+
+					// searching for all?
+					if (strcmp(pQuery->title, "*")) {
+						// ignore not similar titles
+						if (title.find(pQuery->title) == std::string::npos && strstr(pQuery->title, title.c_str()) == NULL)
+							continue;
+						
+						// ignore not precisely same titles
+						/*if (_stricmp(title.c_str(), pQuery->title))
+							continue;*/
+					}						
+					
+					href = source_get_value(&row, 0, 2, "<a href=\"/texty-pisni/", "\"");
+					if (!href.empty()) {
+						std::string lyrics_url = "http://www.karaoketexty.cz/texty-pisni/";
+						lyrics_url += href;
+
+						lyric_container_base* new_lyric = p_results->AddResult();
+
+						new_lyric->SetTimestamped(false);
+						new_lyric->SetFoundInfo(artist.c_str(), album.c_str(), title.c_str());
+						new_lyric->SetSources(lyrics_url.c_str(), lyrics_url.c_str(), GetGUID(), ST_INTERNET);
+						new_lyric->SetLoaded(false);
+					}
+
+					href = source_get_value(&row, 0, 2, "<a href=\"/karaoke/", "\"");
+					if (!href.empty()) {
+						/*std::string karaoke_url = "http://www.karaoketexty.cz/karaoke/";
+						karaoke_url += href;
+											
+						lyric_container_base* new_lyric = p_results->AddResult();
+
+						new_lyric->SetTimestamped(true);
+						new_lyric->SetFoundInfo(artist.c_str(), album.c_str(), title.c_str());
+						new_lyric->SetSources(karaoke_url.c_str(), karaoke_url.c_str(), GetGUID(), ST_INTERNET);
+						new_lyric->SetLoaded(false);*/
+					}
+
+				}
+
+			}
+
+		}		
 	}		
 
 	return true;
@@ -154,8 +229,14 @@ bool my_lyrics_source::Load( lyric_container_base* lyric )
 	
 	// download and parse lyrics	
 	pfc::string8 url;
-	url = "http://www.karaoketexty.cz";
-	url += source_private;
+
+/*	if (lyric->IsTimestamped()) {
+		url = "http://www.karaoketexty.cz/karaoke/";
+	} else {
+		url = "http://www.karaoketexty.cz/texty-pisni/";
+	}
+	url += source_private;*/
+	url = source_private;
 
 	pfc::string8 page;
 
@@ -163,19 +244,27 @@ bool my_lyrics_source::Load( lyric_container_base* lyric )
 
 	std::string data = page;
 
-	std::string::size_type start = data.find("<p class=\"text\">", 0);
-	std::string::size_type end = data.find("</p>", start);
-	if (start == std::string::npos || end == std::string::npos)
-		return false;
+	if (lyric->IsTimestamped()) {
 
-	start += 16;
-	std::string lyrics = data.substr(start, end-start);
-	replace_all(&lyrics, "<br />", "");
+		//lyric->SetLyric("TODO: BUDE CASOVANE!");
 
-	// TODO: add authors!
+	} else {
 
-	//Copy the lyric text into here
-	lyric->SetLyric( lyrics.c_str() );
+		std::string::size_type start = data.find("<p class=\"text\">", 0);
+		std::string::size_type end = data.find("</p>", start);
+		if (start == std::string::npos || end == std::string::npos)
+			return false;
+
+		start += 16;
+		std::string lyrics = data.substr(start, end-start);
+		replace_all(&lyrics, "<br />", "");
+
+		// TODO: add authors!
+
+		//Copy the lyric text into here
+		lyric->SetLyric( lyrics.c_str() );
+
+	}
 
 	//You should set this if the lyric loads properly.
 	// lyric->SetLoaded(); // automatically in SetLyric
