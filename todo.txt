@@ -1,1 +1,7 @@
 Opravit ignorování posledních 2 alb u Jaksi Taksi = proè download_page stahuje pouze 100000 znakù?
+
+http://www.hydrogenaudio.org/forums/index.php?showtopic=83288&hl=HttpClient
+http://foosion.foobar2000.org/doxygen/latest/http__client_8h_source.html
+http://foosion.foobar2000.org/doxygen/latest/classhttp__request.html
+
+zkusit, pøípadnì se zeptat na fóru
